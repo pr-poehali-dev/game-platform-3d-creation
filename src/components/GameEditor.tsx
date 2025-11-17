@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import Game3DEngine from './Game3DEngine';
 
 interface GameEditorProps {
   onBack: () => void;
@@ -15,19 +16,34 @@ interface GameObject {
   id: number;
   name: string;
   type: 'Part' | 'SpawnLocation' | 'Model' | 'Script';
-  x: number;
-  y: number;
-  z: number;
+  position: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
   color: string;
-  size: { x: number; y: number; z: number };
 }
 
 const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
   const { toast } = useToast();
   const [selectedObject, setSelectedObject] = useState<number | null>(null);
   const [objects, setObjects] = useState<GameObject[]>([
-    { id: 1, name: 'Baseplate', type: 'Part', x: 0, y: -2, z: 0, color: '#4a5568', size: { x: 512, y: 1, z: 512 } },
-    { id: 2, name: 'SpawnLocation', type: 'SpawnLocation', x: 0, y: 0.5, z: 0, color: '#3b82f6', size: { x: 6, y: 1, z: 6 } },
+    { 
+      id: 1, 
+      name: 'Baseplate', 
+      type: 'Part', 
+      position: [0, -0.5, 0], 
+      rotation: [0, 0, 0],
+      scale: [50, 0.5, 50],
+      color: '#4a5568'
+    },
+    { 
+      id: 2, 
+      name: 'SpawnLocation', 
+      type: 'SpawnLocation', 
+      position: [0, 0.5, 0], 
+      rotation: [0, 0, 0],
+      scale: [3, 0.5, 3],
+      color: '#3b82f6'
+    },
   ]);
   const [activeTool, setActiveTool] = useState<'select' | 'move' | 'scale' | 'rotate'>('select');
   const [history, setHistory] = useState<GameObject[][]>([objects]);
@@ -75,11 +91,10 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
       id: Date.now(),
       name: type === 'Part' ? 'Part' : type === 'SpawnLocation' ? 'SpawnLocation' : 'Model',
       type,
-      x: Math.random() * 20 - 10,
-      y: Math.random() * 10 + 5,
-      z: Math.random() * 20 - 10,
+      position: [Math.random() * 10 - 5, 2 + Math.random() * 5, Math.random() * 10 - 5],
+      rotation: [0, 0, 0],
+      scale: [2, 2, 2],
       color: type === 'SpawnLocation' ? '#3b82f6' : `hsl(${Math.random() * 360}, 70%, 50%)`,
-      size: { x: 4, y: 4, z: 4 },
     };
     const newObjects = [...objects, newPart];
     saveToHistory(newObjects);
@@ -102,7 +117,12 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
   const duplicateObject = (id: number) => {
     const obj = objects.find(o => o.id === id);
     if (obj) {
-      const newObj = { ...obj, id: Date.now(), name: `${obj.name} (Copy)`, x: obj.x + 2, z: obj.z + 2 };
+      const newObj: GameObject = { 
+        ...obj, 
+        id: Date.now(), 
+        name: `${obj.name} (Copy)`,
+        position: [obj.position[0] + 2, obj.position[1], obj.position[2] + 2]
+      };
       const newObjects = [...objects, newObj];
       saveToHistory(newObjects);
       setSelectedObject(newObj.id);
@@ -115,17 +135,27 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
     setObjects(newObjects);
   };
 
-  const updateObjectSize = (id: number, axis: 'x' | 'y' | 'z', value: number) => {
-    const newObjects = objects.map(o => 
-      o.id === id ? { ...o, size: { ...o.size, [axis]: Math.max(0.1, value) } } : o
-    );
+  const updateObjectPosition = (id: number, axis: number, value: number) => {
+    const newObjects = objects.map(o => {
+      if (o.id === id) {
+        const newPosition: [number, number, number] = [...o.position];
+        newPosition[axis] = value;
+        return { ...o, position: newPosition };
+      }
+      return o;
+    });
     setObjects(newObjects);
   };
 
-  const updateObjectPosition = (id: number, axis: 'x' | 'y' | 'z', value: number) => {
-    const newObjects = objects.map(o => 
-      o.id === id ? { ...o, [axis]: value } : o
-    );
+  const updateObjectScale = (id: number, axis: number, value: number) => {
+    const newObjects = objects.map(o => {
+      if (o.id === id) {
+        const newScale: [number, number, number] = [...o.scale];
+        newScale[axis] = Math.max(0.1, value);
+        return { ...o, scale: newScale };
+      }
+      return o;
+    });
     setObjects(newObjects);
   };
 
@@ -136,7 +166,10 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
   const playGame = () => {
     setIsPlaying(!isPlaying);
     if (!isPlaying) {
-      toast({ title: "Игра запущена", description: "Режим тестирования активен" });
+      toast({ 
+        title: "🎮 Игра запущена", 
+        description: "WASD - движение, Пробел - прыжок" 
+      });
     } else {
       toast({ title: "Игра остановлена", description: "Вернулись в режим редактирования" });
     }
@@ -335,65 +368,20 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
         </aside>
 
         <main className="flex-1 bg-[#1e1e1e] relative">
-          <div 
-            className="absolute inset-0"
-            style={{
-              background: isPlaying 
-                ? 'linear-gradient(to bottom, #1a1a2e 0%, #16213e 50%, #0f3460 100%)'
-                : 'linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 50%, #90ee90 100%)',
-            }}
-          >
-            <div 
-              className="absolute inset-0"
-              style={{
-                backgroundImage: `
-                  repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0, 0, 0, 0.05) 49px, rgba(0, 0, 0, 0.05) 50px),
-                  repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(0, 0, 0, 0.05) 49px, rgba(0, 0, 0, 0.05) 50px)
-                `,
-                transform: 'perspective(500px) rotateX(60deg)',
-                transformOrigin: 'center bottom',
-              }}
-            />
-
-            <div className="absolute inset-0 flex items-center justify-center" style={{ perspective: '1000px' }}>
-              {objects.map((obj) => (
-                <div
-                  key={obj.id}
-                  className={`absolute transition-all cursor-pointer ${
-                    selectedObject === obj.id ? 'ring-4 ring-blue-400' : ''
-                  } ${activeTool === 'move' ? 'hover:ring-2 hover:ring-yellow-400' : ''}`}
-                  style={{
-                    left: `calc(50% + ${obj.x * 10}px)`,
-                    top: `calc(50% + ${obj.y * 5}px)`,
-                    width: `${obj.size.x * 10}px`,
-                    height: `${obj.size.y * 10}px`,
-                    backgroundColor: obj.color,
-                    transform: `translateZ(${obj.z * 10}px) rotateX(-20deg)`,
-                    boxShadow: selectedObject === obj.id 
-                      ? '0 0 40px rgba(59, 130, 246, 0.8), 0 10px 30px rgba(0, 0, 0, 0.3)'
-                      : '0 10px 30px rgba(0, 0, 0, 0.3)',
-                  }}
-                  onClick={() => setSelectedObject(obj.id)}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="absolute top-4 left-4 bg-[#252526]/90 backdrop-blur-sm border border-[#3e3e42] rounded p-2 text-white text-xs space-y-1">
-            <div className="flex items-center gap-2">
-              <Icon name="Camera" size={12} className="text-blue-400" />
-              <span>Camera: Free</span>
-            </div>
-            <div>Position: 0, 20, 30</div>
-            <div className="flex items-center gap-2">
-              <Icon name="Zap" size={12} className="text-yellow-400" />
-              <span>FPS: 60</span>
-            </div>
-          </div>
+          <Game3DEngine 
+            objects={objects}
+            selectedObject={selectedObject}
+            onSelectObject={setSelectedObject}
+            isPlaying={isPlaying}
+            activeTool={activeTool}
+          />
 
           {isPlaying && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/50 backdrop-blur-sm text-white px-6 py-3 rounded-lg">
-              <span className="text-lg font-semibold">▶ Режим тестирования</span>
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-sm text-white px-6 py-2 rounded-lg">
+              <div className="text-center">
+                <p className="font-semibold">🎮 Режим игры</p>
+                <p className="text-xs mt-1">WASD - движение | Пробел - прыжок</p>
+              </div>
             </div>
           )}
         </main>
@@ -424,74 +412,38 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
                   <div>
                     <div className="text-xs text-gray-400 mb-2">Position</div>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">X</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.x.toFixed(2)}
-                          onChange={(e) => updateObjectPosition(selectedObject, 'x', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">Y</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.y.toFixed(2)}
-                          onChange={(e) => updateObjectPosition(selectedObject, 'y', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">Z</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.z.toFixed(2)}
-                          onChange={(e) => updateObjectPosition(selectedObject, 'z', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
+                      {['X', 'Y', 'Z'].map((axis, idx) => (
+                        <div key={axis} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 w-4">{axis}</span>
+                          <Input 
+                            type="number"
+                            step="0.5"
+                            value={objects.find(o => o.id === selectedObject)?.position[idx].toFixed(2)}
+                            onChange={(e) => updateObjectPosition(selectedObject, idx, parseFloat(e.target.value))}
+                            className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
                   <Separator className="bg-[#3e3e42]" />
 
                   <div>
-                    <div className="text-xs text-gray-400 mb-2">Size</div>
+                    <div className="text-xs text-gray-400 mb-2">Scale</div>
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">X</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.size.x}
-                          onChange={(e) => updateObjectSize(selectedObject, 'x', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">Y</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.size.y}
-                          onChange={(e) => updateObjectSize(selectedObject, 'y', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 w-4">Z</span>
-                        <Input 
-                          type="number"
-                          step="0.1"
-                          value={objects.find(o => o.id === selectedObject)?.size.z}
-                          onChange={(e) => updateObjectSize(selectedObject, 'z', parseFloat(e.target.value))}
-                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
-                        />
-                      </div>
+                      {['X', 'Y', 'Z'].map((axis, idx) => (
+                        <div key={axis} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400 w-4">{axis}</span>
+                          <Input 
+                            type="number"
+                            step="0.5"
+                            value={objects.find(o => o.id === selectedObject)?.scale[idx]}
+                            onChange={(e) => updateObjectScale(selectedObject, idx, parseFloat(e.target.value))}
+                            className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -567,6 +519,12 @@ const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
           <span>{objects.length} Parts</span>
           <span>•</span>
           <span>Tool: {activeTool}</span>
+          {isPlaying && (
+            <>
+              <span>•</span>
+              <span className="text-yellow-300">▶ Playing</span>
+            </>
+          )}
         </div>
       </footer>
     </div>

@@ -1,373 +1,412 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 
 interface GameEditorProps {
   onBack: () => void;
   gameId: string | null;
 }
 
+interface GameObject {
+  id: number;
+  name: string;
+  type: 'Part' | 'SpawnLocation' | 'Model' | 'Script';
+  x: number;
+  y: number;
+  z: number;
+  color: string;
+  size: { x: number; y: number; z: number };
+}
+
 const GameEditor = ({ onBack, gameId }: GameEditorProps) => {
-  const [selectedTool, setSelectedTool] = useState<string>('object');
-  const [objects, setObjects] = useState<any[]>([
-    { id: 1, type: 'cube', x: 0, y: 0, z: 0, color: '#9b87f5' },
+  const [selectedObject, setSelectedObject] = useState<number | null>(null);
+  const [objects, setObjects] = useState<GameObject[]>([
+    { id: 1, name: 'Baseplate', type: 'Part', x: 0, y: -2, z: 0, color: '#4a5568', size: { x: 512, y: 1, z: 512 } },
+    { id: 2, name: 'SpawnLocation', type: 'SpawnLocation', x: 0, y: 0.5, z: 0, color: '#3b82f6', size: { x: 6, y: 1, z: 6 } },
   ]);
-  const [lightIntensity, setLightIntensity] = useState([80]);
-  const [gravity, setGravity] = useState([9.8]);
+  const [activeTool, setActiveTool] = useState<'select' | 'move' | 'scale' | 'rotate'>('select');
 
-  const tools = [
-    { id: 'object', icon: 'Box', label: 'Объекты' },
-    { id: 'script', icon: 'Code', label: 'Скрипт' },
-    { id: 'physics', icon: 'Zap', label: 'Физика' },
-    { id: 'material', icon: 'Palette', label: 'Материалы' },
-    { id: 'light', icon: 'Lightbulb', label: 'Свет' },
-    { id: 'camera', icon: 'Camera', label: 'Камера' },
-  ];
-
-  const primitives = [
-    { type: 'cube', icon: '□', label: 'Куб' },
-    { type: 'sphere', icon: '○', label: 'Сфера' },
-    { type: 'cylinder', icon: '▭', label: 'Цилиндр' },
-    { type: 'plane', icon: '▬', label: 'Плоскость' },
-  ];
-
-  const addObject = (type: string) => {
-    const newObject = {
+  const addPart = (type: 'Part' | 'SpawnLocation' | 'Model') => {
+    const newPart: GameObject = {
       id: Date.now(),
+      name: type === 'Part' ? 'Part' : type === 'SpawnLocation' ? 'SpawnLocation' : 'Model',
       type,
-      x: Math.random() * 400 - 200,
-      y: Math.random() * 200,
-      z: Math.random() * 400 - 200,
-      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+      x: Math.random() * 20 - 10,
+      y: Math.random() * 10 + 5,
+      z: Math.random() * 20 - 10,
+      color: type === 'SpawnLocation' ? '#3b82f6' : `hsl(${Math.random() * 360}, 70%, 50%)`,
+      size: { x: 4, y: 4, z: 4 },
     };
-    setObjects([...objects, newObject]);
+    setObjects([...objects, newPart]);
+    setSelectedObject(newPart.id);
+  };
+
+  const deleteObject = (id: number) => {
+    setObjects(objects.filter(obj => obj.id !== id));
+    if (selectedObject === id) setSelectedObject(null);
+  };
+
+  const duplicateObject = (id: number) => {
+    const obj = objects.find(o => o.id === id);
+    if (obj) {
+      const newObj = { ...obj, id: Date.now(), name: `${obj.name} (Copy)`, x: obj.x + 2, z: obj.z + 2 };
+      setObjects([...objects, newObj]);
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <Icon name="ArrowLeft" size={24} />
+    <div className="h-screen flex flex-col bg-[#2d2d30]">
+      <header className="h-12 bg-[#2d2d30] border-b border-[#3e3e42] flex items-center px-4 gap-4">
+        <Button variant="ghost" size="sm" onClick={onBack} className="text-white hover:bg-[#3e3e42]">
+          <Icon name="ArrowLeft" size={18} />
+        </Button>
+        
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="text-white hover:bg-[#007acc]">
+            <Icon name="Save" size={18} />
           </Button>
-          <div>
-            <h1 className="text-lg font-semibold">
-              {gameId ? 'Редактирование игры' : 'Новая игра'}
-            </h1>
-            <p className="text-xs text-muted-foreground">Автосохранение...</p>
-          </div>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-[#007acc]">
+            <Icon name="Undo" size={18} />
+          </Button>
+          <Button variant="ghost" size="sm" className="text-white hover:bg-[#007acc]">
+            <Icon name="Redo" size={18} />
+          </Button>
         </div>
 
+        <Separator orientation="vertical" className="h-6 bg-[#3e3e42]" />
+
+        <div className="flex items-center gap-1">
+          <Button 
+            variant={activeTool === 'select' ? 'secondary' : 'ghost'} 
+            size="sm" 
+            className={activeTool === 'select' ? 'bg-[#007acc] text-white' : 'text-white hover:bg-[#3e3e42]'}
+            onClick={() => setActiveTool('select')}
+          >
+            <Icon name="MousePointer" size={18} />
+          </Button>
+          <Button 
+            variant={activeTool === 'move' ? 'secondary' : 'ghost'} 
+            size="sm"
+            className={activeTool === 'move' ? 'bg-[#007acc] text-white' : 'text-white hover:bg-[#3e3e42]'}
+            onClick={() => setActiveTool('move')}
+          >
+            <Icon name="Move" size={18} />
+          </Button>
+          <Button 
+            variant={activeTool === 'scale' ? 'secondary' : 'ghost'} 
+            size="sm"
+            className={activeTool === 'scale' ? 'bg-[#007acc] text-white' : 'text-white hover:bg-[#3e3e42]'}
+            onClick={() => setActiveTool('scale')}
+          >
+            <Icon name="Maximize2" size={18} />
+          </Button>
+          <Button 
+            variant={activeTool === 'rotate' ? 'secondary' : 'ghost'} 
+            size="sm"
+            className={activeTool === 'rotate' ? 'bg-[#007acc] text-white' : 'text-white hover:bg-[#3e3e42]'}
+            onClick={() => setActiveTool('rotate')}
+          >
+            <Icon name="RotateCw" size={18} />
+          </Button>
+        </div>
+
+        <Separator orientation="vertical" className="h-6 bg-[#3e3e42]" />
+
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Icon name="Play" size={16} className="mr-2" />
-            Тест
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="bg-[#16825d] text-white hover:bg-[#1a9e6f]"
+          >
+            <Icon name="Play" size={18} className="mr-1" />
+            Play
           </Button>
-          <Button size="sm" className="bg-gradient-to-r from-primary to-accent neon-glow">
-            <Icon name="Share2" size={16} className="mr-2" />
-            Опубликовать
-          </Button>
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs text-gray-400">File | {gameId || 'New Place'}</span>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        <aside className="w-80 bg-card border-r border-border overflow-y-auto">
-          <Tabs value={selectedTool} onValueChange={setSelectedTool} className="h-full">
-            <TabsList className="w-full grid grid-cols-3 rounded-none h-auto p-2 bg-muted/50">
-              {tools.slice(0, 6).map((tool) => (
-                <TabsTrigger 
-                  key={tool.id} 
-                  value={tool.id}
-                  className="flex flex-col gap-1 py-3 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  <Icon name={tool.icon as any} size={20} />
-                  <span className="text-xs">{tool.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+        <aside className="w-64 bg-[#252526] border-r border-[#3e3e42] flex flex-col">
+          <div className="p-2 border-b border-[#3e3e42]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-white">Explorer</span>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-white hover:bg-[#3e3e42]">
+                <Icon name="Plus" size={14} />
+              </Button>
+            </div>
+            <Input 
+              placeholder="Filter workspace" 
+              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+            />
+          </div>
 
-            <TabsContent value="object" className="p-4 space-y-4 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Примитивы</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {primitives.map((prim) => (
-                    <Button
-                      key={prim.type}
-                      variant="outline"
-                      className="h-20 flex flex-col gap-2 hover:border-primary hover:bg-primary/10"
-                      onClick={() => addObject(prim.type)}
-                    >
-                      <span className="text-3xl">{prim.icon}</span>
-                      <span className="text-xs">{prim.label}</span>
-                    </Button>
-                  ))}
+          <ScrollArea className="flex-1">
+            <div className="p-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-white text-sm py-1 px-2 hover:bg-[#2a2d2e] rounded cursor-pointer">
+                  <Icon name="ChevronDown" size={14} />
+                  <Icon name="Folder" size={14} className="text-blue-400" />
+                  <span className="text-xs">Workspace</span>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Объекты на сцене</h3>
-                <div className="space-y-2">
+                <div className="ml-4 space-y-1">
                   {objects.map((obj) => (
-                    <Card key={obj.id} className="p-3 hover:bg-accent/10 cursor-pointer transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-8 h-8 rounded"
-                          style={{ backgroundColor: obj.color }}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium capitalize">{obj.type}</p>
-                          <p className="text-xs text-muted-foreground">ID: {obj.id}</p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Icon name="Trash2" size={16} />
-                        </Button>
+                    <div 
+                      key={obj.id}
+                      className={`flex items-center justify-between gap-1 text-white text-sm py-1 px-2 rounded cursor-pointer ${
+                        selectedObject === obj.id ? 'bg-[#094771]' : 'hover:bg-[#2a2d2e]'
+                      }`}
+                      onClick={() => setSelectedObject(obj.id)}
+                    >
+                      <div className="flex items-center gap-1 flex-1">
+                        <Icon name="Box" size={14} className={obj.type === 'SpawnLocation' ? 'text-blue-400' : 'text-gray-400'} />
+                        <span className="text-xs truncate">{obj.name}</span>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="script" className="p-4 space-y-4 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Скриптинг</h3>
-                <Card className="p-4 bg-muted/50 font-mono text-sm">
-                  <div className="text-primary">function</div>
-                  <div className="ml-4">onPlayerJoin() {'{'}</div>
-                  <div className="ml-8 text-muted-foreground">// Ваш код</div>
-                  <div className="ml-4">{'}'}</div>
-                </Card>
-              </div>
-
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <Icon name="Plus" size={16} className="mr-2" />
-                  Новый скрипт
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Icon name="FileCode" size={16} className="mr-2" />
-                  Шаблоны
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="physics" className="p-4 space-y-6 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Физика</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-xs mb-2 block">Гравитация: {gravity[0]} м/с²</Label>
-                    <Slider 
-                      value={gravity} 
-                      onValueChange={setGravity}
-                      min={0} 
-                      max={20} 
-                      step={0.1}
-                      className="mb-2"
-                    />
-                  </div>
-
-                  <Card className="p-3 bg-muted/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon name="Wind" size={16} className="text-primary" />
-                      <span className="text-sm font-medium">Ветер</span>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Включить
-                    </Button>
-                  </Card>
-
-                  <Card className="p-3 bg-muted/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Icon name="Droplet" size={16} className="text-secondary" />
-                      <span className="text-sm font-medium">Вода</span>
-                    </div>
-                    <Button variant="outline" size="sm" className="w-full">
-                      Добавить
-                    </Button>
-                  </Card>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="material" className="p-4 space-y-4 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Материалы</h3>
-                
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {['#9b87f5', '#0EA5E9', '#D946EF', '#F97316', '#10b981', '#ef4444'].map((color) => (
-                    <button
-                      key={color}
-                      className="aspect-square rounded-lg border-2 border-border hover:border-primary transition-colors"
-                      style={{ backgroundColor: color }}
-                    />
                   ))}
                 </div>
 
-                <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Sparkles" size={16} className="mr-2" />
-                    Металл
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Gem" size={16} className="mr-2" />
-                    Стекло
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Mountain" size={16} className="mr-2" />
-                    Камень
-                  </Button>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="light" className="p-4 space-y-6 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Освещение</h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-xs mb-2 block">Интенсивность: {lightIntensity[0]}%</Label>
-                    <Slider 
-                      value={lightIntensity} 
-                      onValueChange={setLightIntensity}
-                      min={0} 
-                      max={100} 
-                      step={1}
-                      className="mb-2"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start">
-                      <Icon name="Sun" size={16} className="mr-2" />
-                      Направленный свет
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Icon name="Lightbulb" size={16} className="mr-2" />
-                      Точечный свет
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <Icon name="Flashlight" size={16} className="mr-2" />
-                      Прожектор
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="camera" className="p-4 space-y-4 mt-0">
-              <div>
-                <h3 className="text-sm font-semibold mb-3">Камера</h3>
-                
-                <div className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Camera" size={16} className="mr-2" />
-                    От первого лица
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Users" size={16} className="mr-2" />
-                    От третьего лица
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start">
-                    <Icon name="Maximize" size={16} className="mr-2" />
-                    Свободная
-                  </Button>
+                <div className="flex items-center gap-1 text-white text-sm py-1 px-2 hover:bg-[#2a2d2e] rounded cursor-pointer">
+                  <Icon name="ChevronRight" size={14} />
+                  <Icon name="Users" size={14} className="text-green-400" />
+                  <span className="text-xs">Players</span>
                 </div>
 
-                <Card className="p-3 bg-muted/50 mt-4">
-                  <p className="text-xs text-muted-foreground mb-2">Управление:</p>
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span>Поворот</span>
-                      <span className="text-primary">ЛКМ + Drag</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Перемещение</span>
-                      <span className="text-primary">WASD</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Зум</span>
-                      <span className="text-primary">Колесико</span>
-                    </div>
-                  </div>
-                </Card>
+                <div className="flex items-center gap-1 text-white text-sm py-1 px-2 hover:bg-[#2a2d2e] rounded cursor-pointer">
+                  <Icon name="ChevronRight" size={14} />
+                  <Icon name="Lightbulb" size={14} className="text-yellow-400" />
+                  <span className="text-xs">Lighting</span>
+                </div>
+
+                <div className="flex items-center gap-1 text-white text-sm py-1 px-2 hover:bg-[#2a2d2e] rounded cursor-pointer">
+                  <Icon name="ChevronRight" size={14} />
+                  <Icon name="Settings" size={14} className="text-gray-400" />
+                  <span className="text-xs">ReplicatedStorage</span>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          </ScrollArea>
         </aside>
 
-        <main className="flex-1 bg-muted/30 relative overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative w-full h-full" style={{ perspective: '1000px' }}>
-              <div 
-                className="absolute inset-0"
-                style={{
-                  background: 'linear-gradient(to bottom, hsl(220, 27%, 15%) 0%, hsl(220, 27%, 8%) 100%)',
-                  backgroundImage: `
-                    repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(155, 135, 245, 0.1) 49px, rgba(155, 135, 245, 0.1) 50px),
-                    repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(155, 135, 245, 0.1) 49px, rgba(155, 135, 245, 0.1) 50px)
-                  `,
-                }}
-              />
-              
-              <div className="absolute inset-0 flex items-center justify-center">
-                {objects.map((obj) => (
-                  <div
-                    key={obj.id}
-                    className="absolute transition-all duration-300 cursor-move hover:scale-110 neon-glow"
-                    style={{
-                      left: `calc(50% + ${obj.x}px)`,
-                      top: `calc(50% + ${obj.y}px)`,
-                      width: '80px',
-                      height: '80px',
-                      backgroundColor: obj.color,
-                      transform: `translateZ(${obj.z}px) rotateX(20deg) rotateY(20deg)`,
-                      borderRadius: obj.type === 'sphere' ? '50%' : '8px',
-                    }}
-                  />
-                ))}
-              </div>
+        <main className="flex-1 bg-[#1e1e1e] relative">
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 50%, #90ee90 100%)',
+            }}
+          >
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: `
+                  repeating-linear-gradient(0deg, transparent, transparent 49px, rgba(0, 0, 0, 0.05) 49px, rgba(0, 0, 0, 0.05) 50px),
+                  repeating-linear-gradient(90deg, transparent, transparent 49px, rgba(0, 0, 0, 0.05) 49px, rgba(0, 0, 0, 0.05) 50px)
+                `,
+                transform: 'perspective(500px) rotateX(60deg)',
+                transformOrigin: 'center bottom',
+              }}
+            />
+
+            <div className="absolute inset-0 flex items-center justify-center" style={{ perspective: '1000px' }}>
+              {objects.map((obj) => (
+                <div
+                  key={obj.id}
+                  className={`absolute transition-all cursor-pointer ${
+                    selectedObject === obj.id ? 'ring-2 ring-blue-400' : ''
+                  }`}
+                  style={{
+                    left: `calc(50% + ${obj.x * 10}px)`,
+                    top: `calc(50% + ${obj.y * 5}px)`,
+                    width: `${obj.size.x * 10}px`,
+                    height: `${obj.size.y * 10}px`,
+                    backgroundColor: obj.color,
+                    transform: `translateZ(${obj.z * 10}px) rotateX(-20deg)`,
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)',
+                  }}
+                  onClick={() => setSelectedObject(obj.id)}
+                />
+              ))}
             </div>
           </div>
 
-          <div className="absolute top-4 left-4 bg-card/80 backdrop-blur-sm border border-border rounded-lg p-3">
-            <div className="text-xs space-y-1">
-              <div className="flex items-center gap-2">
-                <Icon name="Box" size={14} className="text-primary" />
-                <span className="text-muted-foreground">Объектов:</span>
-                <span className="font-semibold">{objects.length}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Icon name="Zap" size={14} className="text-secondary" />
-                <span className="text-muted-foreground">FPS:</span>
-                <span className="font-semibold">60</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-card/80 backdrop-blur-sm border border-border rounded-lg p-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Icon name="Move" size={16} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Icon name="RotateCw" size={16} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Icon name="Maximize2" size={16} />
-            </Button>
-            <div className="w-px h-6 bg-border mx-1" />
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Icon name="Grid3x3" size={16} />
-            </Button>
+          <div className="absolute top-4 left-4 bg-[#252526]/90 backdrop-blur-sm border border-[#3e3e42] rounded p-2 text-white text-xs space-y-1">
+            <div>Camera: Free</div>
+            <div>Position: 0, 20, 30</div>
           </div>
         </main>
+
+        <aside className="w-64 bg-[#252526] border-l border-[#3e3e42] flex flex-col">
+          <div className="p-2 border-b border-[#3e3e42] flex items-center justify-between">
+            <span className="text-xs font-semibold text-white">Properties</span>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="p-3 space-y-3">
+              {selectedObject ? (
+                <>
+                  {objects.find(o => o.id === selectedObject) && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Name</label>
+                        <Input 
+                          value={objects.find(o => o.id === selectedObject)?.name}
+                          onChange={(e) => {
+                            setObjects(objects.map(o => 
+                              o.id === selectedObject ? { ...o, name: e.target.value } : o
+                            ));
+                          }}
+                          className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                        />
+                      </div>
+
+                      <Separator className="bg-[#3e3e42]" />
+
+                      <div>
+                        <div className="text-xs text-gray-400 mb-2">Position</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">X</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.x.toFixed(2)}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">Y</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.y.toFixed(2)}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">Z</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.z.toFixed(2)}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator className="bg-[#3e3e42]" />
+
+                      <div>
+                        <div className="text-xs text-gray-400 mb-2">Size</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">X</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.size.x}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">Y</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.size.y}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-400 w-4">Z</span>
+                            <Input 
+                              type="number"
+                              value={objects.find(o => o.id === selectedObject)?.size.z}
+                              className="h-7 bg-[#3c3c3c] border-[#3e3e42] text-white text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <Separator className="bg-[#3e3e42]" />
+
+                      <div>
+                        <div className="text-xs text-gray-400 mb-2">Color</div>
+                        <input 
+                          type="color"
+                          value={objects.find(o => o.id === selectedObject)?.color}
+                          onChange={(e) => {
+                            setObjects(objects.map(o => 
+                              o.id === selectedObject ? { ...o, color: e.target.value } : o
+                            ));
+                          }}
+                          className="w-full h-8 bg-[#3c3c3c] border border-[#3e3e42] rounded cursor-pointer"
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="text-xs text-gray-400 text-center py-8">
+                  No object selected
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <div className="p-2 border-t border-[#3e3e42] space-y-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start text-white hover:bg-[#3e3e42] text-xs"
+              onClick={() => addPart('Part')}
+            >
+              <Icon name="Plus" size={14} className="mr-2" />
+              Insert Part
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start text-white hover:bg-[#3e3e42] text-xs"
+              onClick={() => addPart('SpawnLocation')}
+            >
+              <Icon name="MapPin" size={14} className="mr-2" />
+              Spawn Location
+            </Button>
+            {selectedObject && (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start text-white hover:bg-[#3e3e42] text-xs"
+                  onClick={() => duplicateObject(selectedObject)}
+                >
+                  <Icon name="Copy" size={14} className="mr-2" />
+                  Duplicate
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full justify-start text-red-400 hover:bg-[#3e3e42] text-xs"
+                  onClick={() => deleteObject(selectedObject)}
+                >
+                  <Icon name="Trash2" size={14} className="mr-2" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        </aside>
       </div>
+
+      <footer className="h-6 bg-[#007acc] flex items-center px-4">
+        <div className="flex items-center gap-4 text-xs text-white">
+          <span>Studio {new Date().getFullYear()}</span>
+          <span>•</span>
+          <span>{objects.length} Parts</span>
+        </div>
+      </footer>
     </div>
   );
 };

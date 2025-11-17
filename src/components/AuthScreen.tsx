@@ -83,10 +83,7 @@ const AuthScreen = ({ onAuth }: AuthScreenProps) => {
             </Button>
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Icon name="Info" size={16} />
-            <span>Код: 0228</span>
-          </div>
+
         </form>
 
         <div className="mt-8 grid grid-cols-3 gap-4 text-center">
